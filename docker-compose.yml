@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: konkurs_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Konkurs2024!
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  bot:
+    build: .
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_ID: ${ADMIN_ID}
+      DATABASE_URL: postgresql://postgres:Konkurs2024!@postgres:5432/konkurs_bot
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:

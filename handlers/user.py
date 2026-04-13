@@ -1,7 +1,8 @@
 from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from states import CourseRegistration
+from states import CourseRegistration, AdminPanel
 from keyboards import get_contact_keyboard, get_yes_no_keyboard
 from config import ADMIN_IDS
 from utils.database import save_registration
@@ -18,8 +19,12 @@ CARD_INFO = (
 )
 
 
-@router.message(F.text == "/start")
+@router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
+    current = await state.get_state()
+    # Admin panelda bo'lsa /start ga to'sqinlik qilmasin
+    if current in (AdminPanel.in_panel, AdminPanel.waiting_for_broadcast):
+        return
     await state.clear()
     await message.answer(
         "Assalomu alaykum! 'Kontent Formula' kursiga ro'yxatdan o'tish uchun ism va familiyangizni kiriting:",
@@ -83,13 +88,16 @@ async def process_payment_intent(message: Message, state: FSMContext):
         )
         await message.answer("Rahmat, sizga tez orada bog'lanamiz! 😊", reply_markup=ReplyKeyboardRemove())
         for admin_id in ADMIN_IDS:
-            await message.bot.send_message(
-                admin_id,
-                f"🔔 Yangi ro'yxatdan o'tish (to'lov yo'q):\n"
-                f"👤 {data.get('name')}\n"
-                f"📞 {data.get('phone')}\n"
-                f"🆔 {message.from_user.id} | @{message.from_user.username or '-'}"
-            )
+            try:
+                await message.bot.send_message(
+                    admin_id,
+                    f"🔔 Yangi ro'yxatdan o'tish (to'lov yo'q):\n"
+                    f"👤 {data.get('name')}\n"
+                    f"📞 {data.get('phone')}\n"
+                    f"🆔 {message.from_user.id} | @{message.from_user.username or '-'}"
+                )
+            except Exception:
+                pass
         await state.clear()
 
     else:
@@ -120,10 +128,13 @@ async def process_receipt(message: Message, state: FSMContext):
         f"🆔 {message.from_user.id} | @{message.from_user.username or '-'}"
     )
     for admin_id in ADMIN_IDS:
-        if message.photo:
-            await message.bot.send_photo(admin_id, file_id, caption=caption)
-        else:
-            await message.bot.send_document(admin_id, file_id, caption=caption)
+        try:
+            if message.photo:
+                await message.bot.send_photo(admin_id, file_id, caption=caption)
+            else:
+                await message.bot.send_document(admin_id, file_id, caption=caption)
+        except Exception:
+            pass
     await state.clear()
 
 
@@ -132,6 +143,8 @@ async def receipt_wrong_format(message: Message):
     await message.answer("Iltimos, chek rasmini (foto yoki fayl) yuboring:")
 
 
-@router.message()
-async def unknown_message(message: Message):
-    await message.answer("Kechirasiz, men sizni tushunmadim. /start buyrug'ini yuboring.")
+@router.message(F.text, ~F.text.startswith("/"))
+async def unknown_message(message: Message, state: FSMContext):
+    current = await state.get_state()
+    if current is None:
+        await message.answer("Boshlash uchun /start buyrug'ini yuboring.")
