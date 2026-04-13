@@ -41,24 +41,31 @@ async def ask_payment_intent(message: Message, state: FSMContext):
     )
     await state.set_state(CourseRegistration.waiting_for_payment_intent)
 
-@router.message(CourseRegistration.waiting_for_payment_intent, F.text.in_(["To'lov qilaman", "To'lov qilmayman"]))
+@router.message(CourseRegistration.waiting_for_payment_intent)
 async def process_payment_intent(message: Message, state: FSMContext):
     if message.text == "To'lov qilaman":
         await state.update_data(payment_intent="Ha")
         
         card_info = (
             "To'lov qiladigan karta raqami:\n\n"
-            "💳 `5614 6835 1146 7011`\n"
+            "💳 <code>5614 6835 1146 7011</code>\n"
             "👤 Xamrayev Dilshodjon\n\n"
             "🔸 Minimal summa: 100.000 so'm\n"
             "🔹 Maksimal summa: 490.000 so'm\n\n"
-            "To'lov qilgandan keyin chekni (rasm yoki skrinshot) tasdiqlash uchun menejerimizga ( **@mobilograf_menejer** ) yuboring. \n\nRahmat sizga tez orada bog'lanamiz."
+            "To'lov qilgandan keyin chekni (rasm yoki skrinshot) tasdiqlash uchun menejerimizga ( <b>@mobilograf_menejer</b> ) yuboring. \n\nRahmat sizga tez orada bog'lanamiz."
         )
-        await message.answer(card_info, reply_markup=ReplyKeyboardRemove(), parse_mode="Markdown")
+        await message.answer(card_info, reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
         
         # User details can be logged here if needed later (e.g. to a DB)
         await state.clear()
-    else:
+    elif message.text == "To'lov qilmayman":
         # User hasn't paid
-        await message.answer("Rahmat sizga tez orada bog'lanamiz", reply_markup=ReplyKeyboardRemove())
+        await message.answer("Rahmat, sizga tez orada bog'lanamiz", reply_markup=ReplyKeyboardRemove())
         await state.clear()
+    else:
+        # Invalid input
+        await message.answer("Iltimos, quyidagi tugmalardan birini tanlang.", reply_markup=get_yes_no_keyboard())
+
+@router.message()
+async def unknown_message(message: Message):
+    await message.answer("Kechirasiz, men sizni tushunmadim. Yangidan boshlash uchun /start buyrug'ini yuboring.")
