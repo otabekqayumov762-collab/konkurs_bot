@@ -1,9 +1,9 @@
-from aiogram import Router, F, Bot
+from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from states import CourseRegistration
 from keyboards import get_contact_keyboard, get_yes_no_keyboard
-from config import ADMIN_ID
+from config import ADMIN_IDS
 from utils.database import save_registration
 
 router = Router()
@@ -52,8 +52,7 @@ async def process_phone_contact(message: Message, state: FSMContext):
 
 @router.message(CourseRegistration.waiting_for_phone, F.text)
 async def process_phone_text(message: Message, state: FSMContext):
-    phone = message.text.strip()
-    await state.update_data(phone=phone)
+    await state.update_data(phone=message.text.strip())
     await ask_payment_intent(message, state)
 
 
@@ -79,21 +78,17 @@ async def process_payment_intent(message: Message, state: FSMContext):
             username=message.from_user.username,
             full_name=data.get("name", ""),
             phone=data.get("phone", ""),
-            payment_intent="Yo'q"
+            payment_intent="Yo'q",
+            receipt_sent=False
         )
-        await message.answer(
-            "Rahmat, sizga tez orada bog'lanamiz! 😊",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        if ADMIN_ID:
+        await message.answer("Rahmat, sizga tez orada bog'lanamiz! 😊", reply_markup=ReplyKeyboardRemove())
+        for admin_id in ADMIN_IDS:
             await message.bot.send_message(
-                ADMIN_ID,
-                f"🔔 Yangi ro'yxatdan o'tish:\n"
-                f"👤 Ism: {data.get('name')}\n"
-                f"📞 Tel: {data.get('phone')}\n"
-                f"💰 To'lov: Yo'q\n"
-                f"🆔 User ID: {message.from_user.id}\n"
-                f"📱 Username: @{message.from_user.username or 'yo\'q'}"
+                admin_id,
+                f"🔔 Yangi ro'yxatdan o'tish (to'lov yo'q):\n"
+                f"👤 {data.get('name')}\n"
+                f"📞 {data.get('phone')}\n"
+                f"🆔 {message.from_user.id} | @{message.from_user.username or '-'}"
             )
         await state.clear()
 
@@ -103,47 +98,40 @@ async def process_payment_intent(message: Message, state: FSMContext):
 
 @router.message(CourseRegistration.waiting_for_receipt, F.photo | F.document)
 async def process_receipt(message: Message, state: FSMContext):
-    if message.photo:
-        file_id = message.photo[-1].file_id
-    else:
-        file_id = message.document.file_id
-
+    file_id = message.photo[-1].file_id if message.photo else message.document.file_id
     data = await state.get_data()
+
     await save_registration(
         user_id=message.from_user.id,
         username=message.from_user.username,
         full_name=data.get("name", ""),
         phone=data.get("phone", ""),
         payment_intent="Ha",
-        receipt_file_id=file_id
+        receipt_sent=True
     )
-
     await message.answer(
         "✅ Chekingiz qabul qilindi! Menejerimiz tez orada siz bilan bog'lanadi. Rahmat!",
         reply_markup=ReplyKeyboardRemove()
     )
-
-    if ADMIN_ID:
-        caption = (
-            f"💳 Yangi TO'LOV:\n"
-            f"👤 Ism: {data.get('name')}\n"
-            f"📞 Tel: {data.get('phone')}\n"
-            f"🆔 User ID: {message.from_user.id}\n"
-            f"📱 Username: @{message.from_user.username or 'yo\'q'}"
-        )
+    caption = (
+        f"💳 YANGI TO'LOV + CHEK:\n"
+        f"👤 {data.get('name')}\n"
+        f"📞 {data.get('phone')}\n"
+        f"🆔 {message.from_user.id} | @{message.from_user.username or '-'}"
+    )
+    for admin_id in ADMIN_IDS:
         if message.photo:
-            await message.bot.send_photo(ADMIN_ID, file_id, caption=caption)
+            await message.bot.send_photo(admin_id, file_id, caption=caption)
         else:
-            await message.bot.send_document(ADMIN_ID, file_id, caption=caption)
-
+            await message.bot.send_document(admin_id, file_id, caption=caption)
     await state.clear()
 
 
 @router.message(CourseRegistration.waiting_for_receipt)
-async def receipt_wrong_format(message: Message, state: FSMContext):
+async def receipt_wrong_format(message: Message):
     await message.answer("Iltimos, chek rasmini (foto yoki fayl) yuboring:")
 
 
 @router.message()
 async def unknown_message(message: Message):
-    await message.answer("Kechirasiz, men sizni tushunmadim. Yangidan boshlash uchun /start buyrug'ini yuboring.")
+    await message.answer("Kechirasiz, men sizni tushunmadim. /start buyrug'ini yuboring.")
