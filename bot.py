@@ -3,22 +3,21 @@ import logging
 from aiogram import Bot, Dispatcher
 from config import BOT_TOKEN
 from handlers import user
+from utils.database import init_db
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    
+
     if not BOT_TOKEN:
         logging.error("BOT_TOKEN is not set in environment or .env file.")
         return
 
-    # Initialize Bot and Dispatcher
+    await init_db()
+
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
-
-    # Include routers from handlers
     dp.include_router(user.router)
 
-    # Start polling
     await bot.delete_webhook(drop_pending_updates=True)
     try:
         await dp.start_polling(bot)
