@@ -101,9 +101,10 @@ async def show_users(message: Message):
             status = "⏳"
         else:
             status = "❌"
+        uname = f"@{r['username']}" if r["username"] else f"id:{r['user_id']}"
         lines.append(
             f"{status} <b>{r['full_name']}</b> | {r['phone']}\n"
-            f"   @{r['username'] or '-'} | {r['registered_at'].strftime('%d.%m %H:%M')}"
+            f"   {uname} | {r['registered_at'].strftime('%d.%m %H:%M')}"
         )
     await message.answer("\n\n".join(lines), parse_mode="HTML", reply_markup=get_admin_keyboard())
 
@@ -118,9 +119,9 @@ async def send_excel(message: Message):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Ro'yxat"
-    for col, width in zip("ABCDEF", [5, 25, 18, 18, 22, 20]):
+    for col, width in zip("ABCDEFG", [5, 25, 18, 20, 15, 22, 20]):
         ws.column_dimensions[col].width = width
-    ws.append(["#", "Ism-Familiya", "Telefon", "Username", "To'lov holati", "Sana"])
+    ws.append(["#", "Ism-Familiya", "Telefon", "Username", "Telegram ID", "To'lov holati", "Sana"])
 
     for i, r in enumerate(rows, 1):
         if r["receipt_sent"]:
@@ -132,6 +133,7 @@ async def send_excel(message: Message):
         ws.append([
             i, r["full_name"], r["phone"],
             f"@{r['username']}" if r["username"] else "-",
+            r["user_id"],
             status,
             r["registered_at"].strftime("%d.%m.%Y %H:%M")
         ])
