@@ -145,6 +145,10 @@ async def receipt_wrong_format(message: Message):
 
 @router.message(F.text, ~F.text.startswith("/"))
 async def unknown_message(message: Message, state: FSMContext):
+    from config import ADMIN_IDS
+    # Admin tugmalari admin handler da qayta ishlanadi
+    if message.from_user.id in ADMIN_IDS:
+        return
     current = await state.get_state()
     if current is None:
         await message.answer("Boshlash uchun /start buyrug'ini yuboring.")
